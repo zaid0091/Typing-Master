@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Typing Master</title>
+    <link rel="shortcut icon" href="logo.png" type="image/x-icon">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <a style="text-decoration: none;" href="/index.html"><div class="nav-logo">Typing<span>Master</span></div></a>
+    <ul class="nav-links">
+      <li><a href="#" class="active">Test</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section id="main-container">
+      <div id="paragraph-box" onclick="focus_now()">Click Start to Begin...</div>
+      <input type="text" id="input-field" oninput='check()'>
+    </section>
+
+    <button id="start-bttn" onclick="again()">Start Test</button>
+
+    <section id="stats-container">
+      <div id="accuracy">
+        <span class="label">Accuracy</span>
+        <div id="acc_con">0%</div>
+      </div>
+      <div id="time">
+        <span class="label">Time <small>(sec)</small></span>
+        <div id="time_con">0</div>
+      </div>
+      <div id="wpm">
+        <span class="label">WPM</span>
+        <div id="wpm_con">0</div>
+      </div>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
