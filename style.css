@@ -223,10 +223,17 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow-x: hidden;
+    /* Prevent main overflow */
 }
 
+/* Wrapper div if it exists (from index.html structure) or direct sections */
+/* We need to ensure children don't burst the flexible container */
+main>div,
 section {
     width: 100%;
+    min-width: 0;
+    /* Critical for Flexbox overflow handling */
     animation: fadeIn 0.5s ease-out;
 }
 
@@ -1487,6 +1494,98 @@ input:checked+.slider:before {
     }
 }
 
+/* ============= Mobile Optimization (< 480px) ============= */
+@media (max-width: 480px) {
+    #main-container {
+        padding: 1rem;
+        width: 100%;
+        margin-top: 1rem;
+        border-right: none;
+        border-left: none;
+        border-radius: 0;
+        backdrop-filter: none;
+        /* Improve performance */
+    }
+
+    /* Scaling Down Fonts */
+    h1#title {
+        font-size: 1.8rem;
+    }
+
+    #timer-display {
+        font-size: 3rem;
+        /* Smaller countdown */
+    }
+
+    #paragraph-box {
+        font-size: 1.1rem;
+        /* Smaller text for reading */
+        line-height: 1.6;
+        min-height: 120px;
+        padding: 1rem;
+    }
+
+    /* Stack Filter Buttons */
+    .filter-controls {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .filter-btn {
+        width: 48%;
+        /* 2 per row */
+        font-size: 0.8rem;
+    }
+
+    /* Adjust Badge Grid */
+    .badges-grid {
+        grid-template-columns: 1fr;
+        /* 1 column */
+    }
+
+    /* Compact Stats */
+    .stats-container {
+        gap: 1rem;
+    }
+
+    .stat-box {
+        padding: 0.8rem;
+        min-width: unset;
+    }
+
+    .stat-label {
+        font-size: 0.7rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    /* Hide Heatmap on tiny screens if too cramped, or scale it */
+    #keyboard-heatmap {
+        transform: scale(0.6);
+        transform-origin: center top;
+        margin-bottom: -40px;
+        /* Counteract scale space */
+    }
+
+    /* Full width inputs */
+    select {
+        width: 100%;
+    }
+
+    /* Adjust Navigation */
+    .nav-links {
+        gap: 1rem;
+    }
+
+    .nav-btn span {
+        display: none;
+        /* Hide text, show icons only if space is tight */
+    }
+}
+
 /* ============= Premium History Table ============= */
 .history-header {
     display: flex;
@@ -1529,10 +1628,53 @@ input:checked+.slider:before {
     border-color: #ef4444;
 }
 
-#history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
+#history-list,
+#leaderboard-list {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Smooth scrolling on iOS */
+    padding-bottom: 0.5rem;
+    /* Space for scrollbar */
+}
+
+.history-table,
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 600px;
+    /* Force scrolling on small screens */
+    margin-top: 1rem;
+}
+
+.history-table th,
+.leaderboard-table th,
+.history-table td,
+.leaderboard-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.history-table th,
+.leaderboard-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.history-table td,
+.leaderboard-table td {
+    color: var(--text-primary);
+}
+
+.history-table tr:hover,
+.leaderboard-table tr:hover {
+    background: var(--bg-tertiary);
 }
 
 /* Using Flexbox for History Rows mimicking table */
