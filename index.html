@@ -20,7 +20,16 @@
       <li><a href="#leaderboard-section" class="nav-link">Leaderboard</a></li>
       <li><a href="#stats-section" class="nav-link">History</a></li>
     </ul>
-    <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">🌙</button>
+    <div class="level-container" title="Your Typing Level">
+      <div class="level-badge">Lv. <span id="level-display">1</span></div>
+      <div class="xp-bar-outer">
+        <div id="xp-bar-inner" class="xp-bar-inner"></div>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">🌙</button>
+      <button id="profile-btn" class="theme-toggle" title="View Profile">👤</button>
+    </div>
   </nav>
 
   <main>
@@ -43,6 +52,7 @@
             <option value="english">English</option>
             <option value="motivational">Motivational</option>
             <option value="technical">Technical Code</option>
+            <option value="dynamic">Dynamic Quotes</option>
           </select>
           <select id="mode" title="Mode">
             <option value="normal">Normal</option>
@@ -60,6 +70,13 @@
               <span class="slider round"></span>
             </label>
             <span>Sound</span>
+          </div>
+          <div class="zen-toggle-container">
+            <label class="switch">
+              <input type="checkbox" id="zen-toggle">
+              <span class="slider round"></span>
+            </label>
+            <span>Zen Mode</span>
           </div>
         </div>
 
@@ -102,6 +119,11 @@
           <div id="coach-tips" class="coach-tips hidden-section"></div>
           <div id="paragraph-box">Click Start to Begin...</div>
           <input type="text" id="input-field">
+        </div>
+
+        <div id="result-chart-container" class="glass-panel hidden-section" style="margin-bottom: 2rem;">
+          <h3>Speed Trends</h3>
+          <canvas id="wpm-chart" height="150"></canvas>
         </div>
 
         <button id="start-bttn">Start Test</button>
@@ -162,8 +184,86 @@
         </div>
       </section>
 
+      <!-- Profile Section -->
+      <section id="profile-section" class="hidden-section">
+        <div class="profile-header">
+          <h2>Player Profile</h2>
+        </div>
+
+        <div class="profile-grid">
+          <!-- Player Overview Card -->
+          <div class="profile-card player-card glass-panel">
+            <div id="profile-avatar-clickable" class="profile-avatar clickable" title="Change Avatar">👤</div>
+            <div class="profile-info">
+              <h3 id="profile-level-tag">Level 1</h3>
+              <p id="profile-xp-tag">0 / 500 XP</p>
+              <div class="profile-xp-bar-outer">
+                <div id="profile-xp-bar-inner" class="profile-xp-bar-inner"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lifetime Stats Card -->
+          <div class="profile-card stats-summary-card glass-panel">
+            <h3>Lifetime Stats</h3>
+            <div class="brief-stats-grid">
+              <div class="brief-stat">
+                <span class="label">Total Tests</span>
+                <span id="profile-total-tests" class="value">0</span>
+              </div>
+              <div class="brief-stat">
+                <span class="label">Total Time</span>
+                <span id="profile-total-time" class="value">0h 0m</span>
+              </div>
+              <div class="brief-stat">
+                <span class="label">Avg. WPM</span>
+                <span id="profile-avg-wpm" class="value">0</span>
+              </div>
+              <div class="brief-stat">
+                <span class="label">Avg. Accuracy</span>
+                <span id="profile-avg-acc" class="value">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Personal Bests Card -->
+          <div class="profile-card records-card glass-panel">
+            <h3>Personal Bests</h3>
+            <div class="pb-list">
+              <div class="pb-item">
+                <span class="difficulty-label">Easy</span>
+                <span id="pb-easy" class="pb-value">0 WPM</span>
+              </div>
+              <div class="pb-item">
+                <span class="difficulty-label">Medium</span>
+                <span id="pb-medium" class="pb-value">0 WPM</span>
+              </div>
+              <div class="pb-item">
+                <span class="difficulty-label">Hard</span>
+                <span id="pb-hard" class="pb-value">0 WPM</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
     </div>
   </main>
+
+  <!-- Avatar Selection Modal -->
+  <div id="avatar-modal" class="modal-overlay hidden-section">
+    <div class="modal-content">
+      <div class="modal-icon">📸</div>
+      <h3>Choose Avatar</h3>
+      <p>Select an icon to represent you.</p>
+      <div id="avatar-grid" class="avatar-grid">
+        <!-- Avatars will be inserted here by JS -->
+      </div>
+      <div class="modal-actions">
+        <button id="avatar-modal-cancel" class="modal-btn secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Custom Modal -->
   <div id="confirmation-modal" class="modal-overlay hidden-section">

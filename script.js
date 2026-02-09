@@ -29,6 +29,10 @@
     const countdownContainer = document.querySelector('#countdown-container');
     const countdownNumber = document.querySelector('#countdown-number');
     const badgesGrid = document.querySelector('#badges-grid');
+    const levelDisplay = document.querySelector('#level-display');
+    const xpBarInner = document.querySelector('#xp-bar-inner');
+    const zenToggle = document.querySelector('#zen-toggle');
+    const profileBtn = document.querySelector('#profile-btn');
 
     // ============= State Variables =============
     let timer = null;
@@ -46,6 +50,9 @@
     let noErrorMode = false;
     let blindMode = false;
     let testInProgress = false;
+    let ghostPace = 0;
+    let ghostIndex = 0;
+    let currentPR = null;
 
     const HEATMAP_UPDATE_INTERVAL = 500;
     const STATS_UPDATE_INTERVAL = 200;
@@ -145,7 +152,109 @@
                 "Zero knowledge proofs demonstrate cryptographic statements without revealing underlying information or requiring trusted intermediaries.",
             ]
         }
+    }
+
+    // ============= User Profile Logic =============
+    const AVATARS = ['👤', '🐱', '🐶', '🦊', '🐼', '🦁', '🐯', '🐨', '🐸', '🐙', '🦖', '🦄', '👻', '🤖', '👽', '👾', '🎮', '💡', '🔥', '✨'];
+
+    const UserProfile = {
+        saveAvatar: function (icon) {
+            localStorage.setItem('userAvatar', icon);
+            this.updateUI();
+            showToast('Avatar updated!');
+        },
+
+        getAvatar: function () {
+            return localStorage.getItem('userAvatar') || '👤';
+        },
+
+        calculateStats: function () {
+            const history = JSON.parse(localStorage.getItem('typingHistory')) || [];
+            if (history.length === 0) return null;
+
+            const totalTests = history.length;
+            const totalSeconds = history.reduce((sum, r) => sum + r.time, 0);
+            const avgWPM = Math.round(history.reduce((sum, r) => sum + r.wpm, 0) / totalTests);
+            const avgAcc = Math.round(history.reduce((sum, r) => sum + r.accuracy, 0) / totalTests);
+
+            // Personal Bests
+            const getPB = (diff) => {
+                const diffResults = history.filter(r => r.difficulty.toLowerCase() === diff.toLowerCase());
+                if (diffResults.length === 0) return 0;
+                return Math.max(...diffResults.map(r => r.wpm));
+            };
+
+            return {
+                totalTests,
+                totalTime: this.formatTime(totalSeconds),
+                avgWPM,
+                avgAcc,
+                pbEasy: getPB('easy'),
+                pbMedium: getPB('medium'),
+                pbHard: getPB('hard')
+            };
+        },
+
+        formatTime: function (seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            if (h > 0) return `${h}h ${m}m`;
+            return `${m}m ${seconds % 60}s`;
+        },
+
+        updateUI: function () {
+            const stats = this.calculateStats();
+
+            // Level & XP (Sync with top bar)
+            const currentXP = parseInt(localStorage.getItem('totalXP')) || 0;
+            const level = Math.floor(currentXP / 1000) + 1;
+            const xpInCurrentLevel = currentXP % 1000;
+            const xpPercentage = (xpInCurrentLevel / 1000) * 100;
+
+            document.getElementById('profile-level-tag').innerText = `Level ${level}`;
+            document.getElementById('profile-xp-tag').innerText = `${xpInCurrentLevel} / 1000 XP`;
+            document.getElementById('profile-xp-bar-inner').style.width = xpPercentage + '%';
+
+            // Avatar updates
+            const userAvatar = this.getAvatar();
+            document.querySelectorAll('.profile-avatar').forEach(el => el.innerText = userAvatar);
+            if (profileBtn) profileBtn.innerText = userAvatar;
+
+            if (!stats) return;
+
+            document.getElementById('profile-total-tests').innerText = stats.totalTests;
+            document.getElementById('profile-total-time').innerText = stats.totalTime;
+            document.getElementById('profile-avg-wpm').innerText = stats.avgWPM;
+            document.getElementById('profile-avg-acc').innerText = stats.avgAcc + '%';
+
+            document.getElementById('pb-easy').innerText = stats.pbEasy + ' WPM';
+            document.getElementById('pb-medium').innerText = stats.pbMedium + ' WPM';
+            document.getElementById('pb-hard').innerText = stats.pbHard + ' WPM';
+        }
     };
+
+    // ============= Dynamic Content Fetching =============
+    async function fetchDynamicQuote() {
+        paragraphBox.innerHTML = '<div class="loading-spinner">✨ Fetching a fresh quote...</div>';
+        try {
+            // Using a reliable public quote API
+            const response = await fetch('https://api.quotable.io/random', { signal: AbortSignal.timeout(5000) });
+            if (!response.ok) throw new Error('Network response not ok');
+            const data = await response.json();
+            return `${data.content} — ${data.author}`;
+        } catch (error) {
+            console.warn("Failed to fetch from primary API, trying fallback...", error);
+            try {
+                // Secondary fallback API
+                const response = await fetch('https://dummyjson.com/quotes/random');
+                const data = await response.json();
+                return `${data.quote} — ${data.author}`;
+            } catch (e) {
+                console.error("All quote APIs failed:", e);
+                return "The best way to predict the future is to create it. Live the life you have imagined. — Fallback Quote";
+            }
+        }
+    }
 
     // ============= Animations =============
     function triggerFireworks() {
@@ -198,6 +307,14 @@
         span.addEventListener('animationend', () => {
             span.style.animation = '';
         }, { once: true });
+    }
+
+    function showVignette(type) {
+        const vignette = document.createElement('div');
+        vignette.className = `vignette vignette-${type}`;
+        document.body.appendChild(vignette);
+        setTimeout(() => vignette.classList.add('fade-out'), 50);
+        setTimeout(() => vignette.remove(), 1000);
     }
 
     // ============= Sound Effects =============
@@ -319,6 +436,73 @@
         document.getElementById('streak-count').innerText = streak + ' Days';
     }
 
+    // ============= WPM Chart =============
+    function renderWPMChart() {
+        const canvas = document.getElementById('wpm-chart');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('result-chart-container');
+
+        if (velocityHistory.length < 2) {
+            container.classList.add('hidden-section');
+            return;
+        }
+
+        container.classList.remove('hidden-section');
+        const width = canvas.offsetWidth;
+        const height = canvas.offsetHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        const dataPoints = velocityHistory.map(h => h.wpm);
+        const maxWpm = Math.max(...dataPoints, 60);
+        const minWpm = Math.min(...dataPoints, 0);
+        const range = maxWpm - minWpm;
+
+        const padding = 20;
+        const chartWidth = width - (padding * 2);
+        const chartHeight = height - (padding * 2);
+
+        // Draw Line
+        ctx.beginPath();
+        ctx.strokeStyle = '#818cf8';
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+
+        dataPoints.forEach((wpm, i) => {
+            const x = padding + (i / (dataPoints.length - 1)) * chartWidth;
+            const y = height - (padding + ((wpm - minWpm) / range) * chartHeight);
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        // Draw Area
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, 'rgba(129, 140, 248, 0.3)');
+        gradient.addColorStop(1, 'rgba(129, 140, 248, 0)');
+        ctx.lineTo(padding + chartWidth, height - padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.closePath();
+        ctx.fillStyle = gradient;
+        ctx.fill();
+
+        // Draw points
+        ctx.fillStyle = '#818cf8';
+        dataPoints.forEach((wpm, i) => {
+            if (i % Math.ceil(dataPoints.length / 10) === 0 || i === dataPoints.length - 1) {
+                const x = padding + (i / (dataPoints.length - 1)) * chartWidth;
+                const y = height - (padding + ((wpm - minWpm) / range) * chartHeight);
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    }
+
     // ============= Achievement Badges =============
     function updateAchievements() {
         const history = JSON.parse(localStorage.getItem('typingHistory')) || [];
@@ -364,6 +548,37 @@
         coachTips.classList.remove('hidden-section');
     }
 
+    // ============= Leveling & XP System =============
+    const XP_PER_LEVEL = 1000;
+
+    function calculateXP(result) {
+        // XP = (WPM * Accuracy) / 10 + bonus for difficulty
+        const difficultyBonus = { 'easy': 1, 'medium': 1.5, 'hard': 2 };
+        const baseXP = (result.wpm * result.accuracy) / 10;
+        return Math.round(baseXP * (difficultyBonus[result.difficulty.toLowerCase()] || 1));
+    }
+
+    function updateLevelingSystem(newXP = 0) {
+        let currentXP = parseInt(localStorage.getItem('totalXP')) || 0;
+        currentXP += newXP;
+        localStorage.setItem('totalXP', currentXP);
+
+        const level = Math.floor(currentXP / XP_PER_LEVEL) + 1;
+        const xpInCurrentLevel = currentXP % XP_PER_LEVEL;
+        const xpPercentage = (xpInCurrentLevel / XP_PER_LEVEL) * 100;
+
+        levelDisplay.innerText = level;
+        xpBarInner.style.width = xpPercentage + '%';
+
+        if (newXP > 0) {
+            console.log(`Gained ${newXP} XP! Total XP: ${currentXP}`);
+            // Trigger burst on level up or major XP gain
+            if (xpInCurrentLevel < newXP) {
+                Visuals.triggerBurst();
+            }
+        }
+    }
+
     // ============= Difficulty Progression =============
     function recommendNextDifficulty(accuracy, wpm) {
         const current = difficultySelect.value;
@@ -405,6 +620,9 @@
                     alert('Please enter custom text first');
                     return;
                 }
+            } else if (language === 'dynamic') {
+                console.log("Fetching dynamic quote...");
+                textToUse = await fetchDynamicQuote();
             } else {
                 // Standard Text Mode
                 console.log("Fetching text for:", difficulty, language);
@@ -442,6 +660,26 @@
             } else {
                 timerDisplay.style.display = 'none';
             }
+
+            if (zenToggle.checked) {
+                document.body.classList.add('zen-mode-active');
+            } else {
+                document.body.classList.remove('zen-mode-active');
+            }
+
+            // Ghost Mode Init
+            const history = JSON.parse(localStorage.getItem('typingHistory')) || [];
+            const relevantPRs = history.filter(r => r.difficulty === difficulty && r.language === language);
+
+            if (relevantPRs.length > 0) {
+                currentPR = relevantPRs.sort((a, b) => b.wpm - a.wpm)[0];
+                // WPM * 5 chars per word / 60 seconds = Chars per second
+                ghostPace = (currentPR.wpm * 5) / 60;
+                ghostIndex = 0;
+            } else {
+                currentPR = null;
+                ghostPace = 0;
+            }
         } catch (error) {
             console.error("Init Error:", error);
             alert("Error starting test: " + error.message);
@@ -460,9 +698,11 @@
         errors_container.innerText = '0';
         velocityDisplay.innerText = '0 WPM';
         paragraphBox.scrollLeft = 0;
+        document.getElementById('result-chart-container').classList.add('hidden-section');
         startBttn.innerText = 'Restart';
         keyboardHeatmapContainer.classList.add('heatmap-hidden');
         coachTips.classList.add('hidden-section');
+        Visuals.reset();
     }
 
     function startTimer() {
@@ -479,7 +719,21 @@
                         finishTest();
                     }
                 }
+
+                // Update Ghost
+                if (ghostPace > 0 && isTestActive) {
+                    ghostIndex = Math.min(Math.floor(ghostPace * secondsPassed), paragraphBox.querySelectorAll('span').length - 1);
+                    updateGhostUI();
+                }
             }, 1000);
+        }
+    }
+
+    function updateGhostUI() {
+        paragraphBox.querySelectorAll('.ghost-highlight').forEach(s => s.classList.remove('ghost-highlight'));
+        const spanArray = paragraphBox.querySelectorAll('span');
+        if (spanArray[ghostIndex]) {
+            spanArray[ghostIndex].classList.add('ghost-highlight');
         }
     }
 
@@ -527,6 +781,7 @@
                 lastWasCorrect = false;
 
                 if (noErrorMode) {
+                    showVignette('error');
                     isTestActive = false;
                     finishTest();
                     return;
@@ -536,6 +791,7 @@
 
         if (inputChars.length > 0) {
             playSound(lastWasCorrect ? 'correct' : 'wrong');
+            if (!lastWasCorrect) showVignette('error');
         }
 
         debouncedHeatmapUpdate();
@@ -550,6 +806,9 @@
                 wpm_container.innerText = liveWPM;
                 velocityDisplay.innerText = liveWPM + ' WPM';
                 velocityHistory.push({ time: secondsPassed, wpm: liveWPM });
+
+                // Update 3D Background
+                Visuals.updateWPM(liveWPM);
 
                 const liveAccuracy = inputChars.length > 0 ? Math.round((correctCount / inputChars.length) * 100) : 0;
                 accuracy_container.innerText = liveAccuracy + '%';
@@ -615,11 +874,18 @@
         };
 
         saveTestResult(testResult);
+        const xpGained = calculateXP(testResult);
+        updateLevelingSystem(xpGained);
+
         updateLeaderboard();
         updateHistory();
         updatePR();
         updateStreak();
         updateAchievements();
+        renderWPMChart();
+        UserProfile.updateUI();
+        document.body.classList.remove('zen-mode-active');
+        showVignette('success');
     }
 
     function saveTestResult(result) {
@@ -751,6 +1017,37 @@
     startBttn.addEventListener('click', init);
     inputArea.addEventListener('input', check);
     themeToggle.addEventListener('click', toggleTheme);
+    profileBtn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        navigate('profile');
+    });
+    // ============= Avatar Modal Logic =============
+    const avatarModal = document.getElementById('avatar-modal');
+    const avatarGrid = document.getElementById('avatar-grid');
+    const avatarCancel = document.getElementById('avatar-modal-cancel');
+    const profileAvatarClickable = document.getElementById('profile-avatar-clickable');
+
+    function openAvatarModal() {
+        avatarGrid.innerHTML = '';
+        const currentAvatar = UserProfile.getAvatar();
+
+        AVATARS.forEach(icon => {
+            const div = document.createElement('div');
+            div.className = `avatar-item ${icon === currentAvatar ? 'selected' : ''}`;
+            div.innerText = icon;
+            div.addEventListener('click', () => {
+                UserProfile.saveAvatar(icon);
+                avatarModal.classList.add('hidden-section');
+            });
+            avatarGrid.appendChild(div);
+        });
+
+        avatarModal.classList.remove('hidden-section');
+    }
+
+    profileAvatarClickable.addEventListener('click', openAvatarModal);
+    avatarCancel.addEventListener('click', () => avatarModal.classList.add('hidden-section'));
+
     // ============= Modal & Toast Logic =============
     const modal = document.getElementById('confirmation-modal');
     const modalCancel = document.getElementById('modal-cancel');
@@ -840,6 +1137,7 @@
             const targetId = e.target.getAttribute('href');
 
             if (targetId === '#test-section') navigate('test');
+            else if (targetId === '#profile-section') navigate('profile');
             else if (targetId === '#achievements-section') navigate('achievements');
             else if (targetId === '#leaderboard-section') navigate('leaderboard');
             else if (targetId === '#stats-section') navigate('stats');
@@ -868,4 +1166,6 @@
     updatePR();
     updateStreak();
     updateAchievements();
+    updateLevelingSystem(0); // Initialize UI without adding XP
+    UserProfile.updateUI();
 })();
